@@ -1,105 +1,131 @@
-import sys, bpy
-import inspect, os
+""" Controls Blender rendering."""
+import argparse
+import bpy
+import inspect
+import os
+import sys
+#
+from pdb import set_trace as BP
 
-def run(switch=None, f_scenes=False, f_anim=False, frame_rng=()):
-    # Local nicknames
-    bcups = bpy.context.user_preferences.system
 
-    def render(scene):
-        # Make scene active
+class DeviceError(Exception):
+    pass
+
+
+gpu_devices = ("CUDA", "OPENCL")
+
+
+def run(device_t=None, scenes=False, samples=None):
+    """ Run rendering procedures."""
+
+    def render(scene, device, samples):
+        """ Set the scene and do the render."""
+        # Make scene active.
         bpy.context.screen.scene = scene
-        # Select the compute device and set it to render to that one
-        if switch == 'CUDA':
-            # Device selection
-            bcups.compute_device_type = 'CUDA'
-            # Print devices
-            print(bcups.compute_device_type, bcups.compute_device)
-            assert bcups.compute_device.startswith('CUDA'), "** CUDA failed **"
-            # Render setting
-            scene.cycles.device = 'GPU'
-        elif switch == 'OPENCL':
-            # Device selection
-            bcups.compute_device_type = 'OPENCL'
-            # Print devices
-            print(bcups.compute_device_type, bcups.compute_device)
-            assert(bcups.compute_device.startswith('OPENCL'),
-                   "** OPENCL failed **")
-            # Render setting
-            scene.cycles.device = 'GPU'
-        else:
-            # Device selection
-            bcups.compute_device_type = 'NONE'
-            # Print devices
-            print(bcups.compute_device_type, bcups.compute_device)
-            assert bcups.compute_device == 'CPU', "** CPU failed **"
-            # Render setting
-            scene.cycles.device = 'CPU'
-        # Print device setting
+        # Set the rendering device.
+        scene.cycles.device = device
+        # Print device setting.
         print(scene.cycles.device)
-        # Set start and end frames for animation
-        if f_anim and frame_rng:
-            scene.frame_start = max(scene.frame_start, frame_rng[0])
-            mx = (frame_rng[1]
-                  if frame_rng[1] > 0 else scene.frame_end + frame_rng[1] + 1)
-            scene.frame_end = min(scene.frame_end, mx)
-        # Set number of samples
-        scene.cycles.samples = 1000
+        # Set number of samples.
+        if samples:
+            scene.cycles.samples = samples
+        # # Set start and end frames for animation.
+        # if frames:
+        #     scene.frame_start = max(frames[0], scene.frame_start)
+        #     f1 = (frames[1] < 0) * (scene.frame_end + 1) + frames[1]
+        #     scene.frame_end = min(f1, scene.frame_end)
+        # Set output path.
         scene.render.filepath = "//%s.png" % scene.name
-        ## Render
-        f_still = True #not f_anim
-        bpy.ops.render.render(animation=f_anim, write_still=f_still)
-        # Print device/setting again, post render
+        # Render.
+        # bpy.ops.render.render(animation=frames, write_still=not frames)
+        bpy.ops.render.render(animation=False, write_still=True)
+        # Print device/setting again after rendering.
         print(bcups.compute_device_type, bcups.compute_device,
               scene.cycles.device)
 
-    # Handle multiple scenes
-    if f_scenes:
-        scenes = bpy.data.scenes[:]
+    # Local nicknames.
+    bcups = bpy.context.user_preferences.system
+    # Select the compute device and set it to render to that one
+    if device_t in gpu_devices:
+        # Device selection.
+        bcups.compute_device_type = device_t
+        # Print devices
+        print(bcups.compute_device_type, bcups.compute_device)
+        if not bcups.compute_device.startswith(device_t):
+            raise DeviceError("Failed to set compute device: %s" % device_t)
+        device = "GPU"
     else:
+        # Device selection.
+        bcups.compute_device_type = "NONE"
+        # Print devices
+        print(bcups.compute_device_type, bcups.compute_device)
+        if not bcups.compute_device.startswith("CPU"):
+            raise DeviceError("Failed to set compute device: CPU")
+        device = "CPU"
+    # Make the list of scenes.
+    if scenes == []:
         scenes = [bpy.context.scene]
-
+    else:
+        scenes = bpy.data.scenes[slice(*scenes)]
     # Loop over scenes
     for scene in scenes:
-        render(scene)
+        render(scene, device, samples)
 
 
-# Main
 if __name__ == "__main__":
-    args = sys.argv
+    ## Cmd line interface.
+    def is_int(s):
+        """ Returns bool indicating whether s can be converted into an int."""
+        try:
+            int(s)
+        except ValueError:
+            x = False
+        else:
+            x = True
+        return x
 
-    # Get relevant arguments
-    if "--" in args:
-        idx = args.index("--")
+    def parse_scenes(S):
+        if S:
+            # Convert each to either a string or an int.
+            X = int(S) if is_int(S) else S
+        else:
+            X = None
+        return X
+
+    # Get the input arguments.
+    # All args.
+    args0 = sys.argv
+    # Relevant arguments.
+    if "--" in args0:
+        idx = args0.index("--")
     else:
-        # script filename (usually with path)
+        # Figure out which argument this script was.
         thisfile = os.path.basename(inspect.getfile(inspect.currentframe()))
-        idx = args.index(thisfile)
-    pargs = args[idx + 1:]
-
-    # Which render device?
-    if len(pargs) > 0:
-        switch = pargs[0]
-    else:
-        switch = None
-    # Scene?
-    if len(pargs) > 1:
-        f_scenes = pargs[1] == "True"
-    else:
-        f_scenes = False
-
-    # Animate?
-    if len(pargs) > 2:
-        f_anim = pargs[2] == "True"
-    else:
-        f_anim = False
-    # Which frame?
-    if len(pargs) > 3:
-        frame_rng = tuple([int(f) for f in pargs[3:5]])
-    else:
-        frame_rng = (1, -1)
-
-    # import pdb
-    # pdb.set_trace()
-
-    # Run render
-    run(switch=switch, f_scenes=f_scenes, f_anim=f_anim, frame_rng=frame_rng)
+        idx = args0.index(thisfile)
+    args = args0[idx + 1:]
+    # Parser object.
+    parser = argparse.ArgumentParser(description="render_runner arguments.")
+    # 'device' argument.
+    devices = gpu_devices + ("CPU",)
+    parser.add_argument(
+        "--device", "-D", choices=devices,
+        help="Specify compute device: (%s)" % (", ".join(devices)))
+    # 'samples' argument.
+    parser.add_argument(
+        "--samples", default=None, type=int,
+        help="Specify how many samples per render.")
+    # 'scenes' argument.
+    parser.add_argument(
+        "--scenes", nargs="*", default=[], type=parse_scenes,
+        help="Specify which scenes to render. No argument means all.")
+    # Create parser and parse args.
+    try:
+        parsed = parser.parse_args(args)
+    except:
+        print("Failed to parse arguments.")
+        BP()
+    device_t = parsed.device
+    samples = parsed.samples
+    scenes = parsed.scenes
+    # Render.
+    run(device_t=device_t, samples=samples, scenes=scenes)
