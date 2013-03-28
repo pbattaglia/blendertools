@@ -29,20 +29,25 @@ def aobj(obj=None):
     return bpy.context.scene.objects.active
 
 
-def add_particle_system(count=5000):
+def add_particle_system(count=5000, seed=0):
     """ Adds a particle system and sets some basic settings."""
     # Add the particle system.
     bpy.ops.object.particle_system_add()
     # Get handle to it and its settings.
     ps = aobj().particle_systems[-1]
-    pss = ps.settings
+    # Set random seed.
+    ps.seed = seed
     # Set its parameters.
+    pss = ps.settings
     pss = aobj().particle_systems[-1].settings
     pss.count = count
-    pss.frame_end = 1
+    frame = bpy.context.scene.frame_current
+    pss.frame_start = frame    
+    pss.frame_end = frame
     pss.lifetime = 1
     pss.emit_from = "VOLUME"
     pss.distribution = "RAND"
+    pss.normal_factor = 0.
     pss.physics_type = "NO"
     update()
     return ps
@@ -156,7 +161,7 @@ def to_convex_hull(obj):
     # Update object's mesh.
     bm.to_mesh(obj.data)
 
-
+    
 @contextmanager
 def bounding_box(obj=None):
     """ Context manager for adding/removing bounding box."""
