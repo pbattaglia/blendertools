@@ -171,7 +171,6 @@ def run():
     scenes = parsed.scenes
     frame = parsed.render_frame
     f_kill = not parsed.no_kill
-    BP()
     if bpy:
         # Render.
         blender_run(f_anim, device_t=device_t, samples=samples, scenes=scenes,
