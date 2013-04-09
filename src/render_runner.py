@@ -168,7 +168,8 @@ def run():
     f_anim = parsed.render_anim
     device_t = parsed.device
     samples = parsed.samples
-    scenes = parsed.scenes
+    scenes = [None if str(s).lower() in ("end", "none") else s
+              for s in parsed.scenes]
     frame = parsed.render_frame
     f_kill = not parsed.no_kill
     if bpy:
