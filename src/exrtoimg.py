@@ -6,7 +6,7 @@ Peter Battaglia
 2013.04.08
 """
 # Standard
-from argparse import ArgumentError, ArgumentParser
+from argparse import Action, ArgumentError, ArgumentParser
 import glob
 from math import log10
 from operator import add
@@ -48,24 +48,31 @@ def get_channels(exrimg, outchans="RGBA"):
     return channels
 
 
-def convert(inname, outname, outchans, normalize, nanfill):
+def convert(inname, outname, outchans, normchans, nanfill):
     """ Convert one file."""
     # Load the .exr file.
     exrimg = load_exr(inname)
     # Get the channels.
     channels = get_channels(exrimg, outchans=outchans)
     # Compose image data into what is necessary for output.
-    outimg = np.squeeze(np.dstack(channels))
+    outimg = np.dstack(channels)
     # Fix nans and infs.
     badidx = ~np.isfinite(outimg)
     if np.any(badidx):
         outimg[badidx] = nanfill
     # Normalize (optionally).
-    if normalize:
-        outimg /= outimg.max()
+    if normchans:
+        # Normalize A and Z channels independently from RGB channels.
+        nchans = [set(normchans).intersection(c) for c in ("RGB", "A", "Z")]
+        for c in nchans:
+            idx = np.array([oc in c for oc in outchans])
+            if idx.any():
+                outimg[:, :, idx] /= outimg[:, :, idx].max()
         # Reset any nanfill values that were changed by normalizing.
         # what was specified.
         outimg[badidx] = nanfill
+    # Squeeze out length-1 dimensions.
+    outimg = np.squeeze(outimg)
     # Write output file.
     imsave(outname, outimg)
 
@@ -76,6 +83,7 @@ if __name__ == "__main__":
     ## Cmd line interface.
     # Create parser object.
     parser = ArgumentParser(description="Output options.")
+    group = parser.add_mutually_exclusive_group()
     # Argument: input file name.
     parser.add_argument("innames", nargs="+", help="Input filename(s).")
     # Argument: output file name.
@@ -87,18 +95,25 @@ if __name__ == "__main__":
                         help="Suffix to append to output file names.")
     # Argument: output file format.
     parser.add_argument("-f", dest="outfmt", default=None,
-                        help="Output file format. Overrides default.")
+                        help="Output file format. Overrides -o extension.")
     # Argument: output file channels.
-    parser.add_argument("-c", dest="outchans",
+    group.add_argument("-c", dest="outchans",
                         default="RGBA", help="Output channels.")
-    # Argument: Z-channel for output file.
-    parser.add_argument("-Z", action="store_true",
-                        help="Output normalized Z channel. Same as -C Z -n.")
     # Argument: normalize output image.
-    parser.add_argument("-n", dest="normalize", action="store_true",
-                        help="Normalize output image.")
+    parser.add_argument("-n", dest="normchans", default="", const="RGBAZ",
+                        nargs="?", help="Normalize output image's channels.")
+    # Argument: Z-channel for output file.
+    class ZAction(Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            setattr(namespace, "outchans", "Z")
+            normchans = getattr(namespace, "normchans")
+            if "Z" not in normchans:
+                setattr(namespace, "normchans", normchans + "Z")
+            delattr(namespace, "Z")
+    group.add_argument("-Z", nargs=0, action=ZAction,
+                        help="Output normalized Z channel. Same as -c Z -n.")
     # Argument: value to fill nans with.
-    parser.add_argument("--nanfill", default=-1,
+    parser.add_argument("--nanfill", default=0,
                         help="Value to replace nans with.")
     # Argument: allow output files to overwrite existing ones.
     parser.add_argument("--force", action="store_true",
@@ -110,10 +125,10 @@ if __name__ == "__main__":
     suffix = parsed.suffix
     outfmt = parsed.outfmt
     outchans = parsed.outchans
-    normalize = parsed.normalize
+    normchans = parsed.normchans
     nanfill = parsed.nanfill
     force = parsed.force
-    ## Set parameters according to inputs.
+    # Set parameters according to inputs.
     N = len(innames)
     if N == 0:
         raise IOError("Cannot find input files that match: %s" %
@@ -151,10 +166,7 @@ if __name__ == "__main__":
             raise IOError("Attempted to overwrite: %s" % on)
         # Store output file name.
         outnames.append(on)
-    # If "-Z" flag was input, override outchans.
-    if parsed.Z:
-        outchans = "Z"
     # Run the converter over all files.
     for inname, outname in zip(innames, outnames):
         # Do the conversion.
-        convert(inname, outname, outchans, normalize, nanfill)
+        convert(inname, outname, outchans, normchans, nanfill)
