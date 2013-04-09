@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """ Converts an .exr (OpenEXR format) file's depth channgel to a .png.
 http://www.blender.org/forum/viewtopic.php?p=98212&sid=4cef7d0c329b3c3fe366e66832482fc0
+
+TODO:
+- Add batch support.
 """
 # Standard
 import argparse
@@ -64,7 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("-Z", action="store_true",
                         help="Output normalized Z channel. Same as -C Z -n.")
     # Argument: normalize output image.
-    parser.add_argument("-n", dest="normalize", default=False,
+    parser.add_argument("-n", dest="normalize", action="store_true",
                         help="Normalize output image.")
     # Argument: default value to fill nans with.
     parser.add_argument("--nanfill", default=-1,
