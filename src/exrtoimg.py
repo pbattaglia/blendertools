@@ -48,10 +48,10 @@ def get_channels(exrimg, outchans="RGBA"):
     return channels
 
 
-def convert(infilename, outfilename, outchans, normalize, nanfill):
+def convert(inname, outname, outchans, normalize, nanfill):
     """ Convert one file."""
     # Load the .exr file.
-    exrimg = load_exr(infilename)
+    exrimg = load_exr(inname)
     # Get the channels.
     channels = get_channels(exrimg, outchans=outchans)
     # Compose image data into what is necessary for output.
@@ -67,7 +67,7 @@ def convert(infilename, outfilename, outchans, normalize, nanfill):
         # what was specified.
         outimg[badidx] = nanfill
     # Write output file.
-    imsave(outfilename, outimg)
+    imsave(outname, outimg)
 
 
 if __name__ == "__main__":
@@ -82,6 +82,9 @@ if __name__ == "__main__":
     parser.add_argument("-o", dest="outname", default="",
                         help=("Output file name. If extension is "
                               "present, it overrides the default."))
+    # Argument: suffix to append to output file names.
+    parser.add_argument("--suffix", default="",
+                        help="Suffix to append to output file names.")
     # Argument: output file format.
     parser.add_argument("-f", dest="outfmt", default=None,
                         help="Output file format. Overrides default.")
@@ -94,17 +97,22 @@ if __name__ == "__main__":
     # Argument: normalize output image.
     parser.add_argument("-n", dest="normalize", action="store_true",
                         help="Normalize output image.")
-    # Argument: default value to fill nans with.
+    # Argument: value to fill nans with.
     parser.add_argument("--nanfill", default=-1,
                         help="Value to replace nans with.")
+    # Argument: allow output files to overwrite existing ones.
+    parser.add_argument("--force", action="store_true",
+                        help="Allow output files to overwrite existing ones.")
     # Create parser and parse args.
     parsed = parser.parse_args()
     innames = reduce(add, [sorted(glob.glob(fn)) for fn in parsed.innames])
     outname = parsed.outname
+    suffix = parsed.suffix
     outfmt = parsed.outfmt
     outchans = parsed.outchans
     normalize = parsed.normalize
     nanfill = parsed.nanfill
+    force = parsed.force
     ## Set parameters according to inputs.
     N = len(innames)
     if N == 0:
@@ -120,7 +128,8 @@ if __name__ == "__main__":
     # Output file's base name without extension.
     outname = os.path.splitext(outname)[0]
     # Output file names.
-    nametemplate = "%%s_%%0%dd" % (int(log10(N)) + 1)
+    nametemplate1 = "%%s%s.%s" % (suffix, outfmt)
+    nametemplateN = "%%s_%%0%dd%s.%s" % (int(log10(N)) + 1, suffix, outfmt)
     outnames = []
     for i, inname in enumerate(innames):
         if not outname:
@@ -130,17 +139,22 @@ if __name__ == "__main__":
             # If outname was supplied, use it and append count if
             # there is more than one inname.
             if N == 1:
-                on = outname
+                on = nametemplate1 % outname
             else:
-                on = nametemplate % (outname, i)
-        outnames.append("%s.%s" % (on, outfmt))
+                on = nametemplateN % (outname, i)
+        # Make sure we never overwrite the input file.
+        if inname == on:
+            raise IOError("Attempted to overwrite: %s" % on)
+        # Raise error if we will overwrite an existing file and
+        # haven't input 'force'.
+        if not force and os.path.isfile(on):
+            raise IOError("Attempted to overwrite: %s" % on)
+        # Store output file name.
+        outnames.append(on)
     # If "-Z" flag was input, override outchans.
     if parsed.Z:
         outchans = "Z"
     # Run the converter over all files.
     for inname, outname in zip(innames, outnames):
-        # Make sure we're not overwriting the input file.
-        if inname == outname:
-            raise ValueError("Attempted to overwrite: %s" % inname)
         # Do the conversion.
         convert(inname, outname, outchans, normalize, nanfill)
