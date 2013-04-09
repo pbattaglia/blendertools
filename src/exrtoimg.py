@@ -157,12 +157,9 @@ if __name__ == "__main__":
                 on = nametemplate1 % outname
             else:
                 on = nametemplateN % (outname, i)
-        # Make sure we never overwrite the input file.
-        if inname == on:
-            raise IOError("Attempted to overwrite: %s" % on)
-        # Raise error if we will overwrite an existing file and
-        # haven't input 'force'.
-        if not force and os.path.isfile(on):
+        # Raise error if: we try to overwrite the input file; we try
+        # to overwrite an existing file and haven't input 'force'.
+        if inname == on or not force and os.path.isfile(on):
             raise IOError("Attempted to overwrite: %s" % on)
         # Store output file name.
         outnames.append(on)
