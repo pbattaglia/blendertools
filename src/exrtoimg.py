@@ -102,14 +102,16 @@ if __name__ == "__main__":
     # Argument: normalize output image.
     parser.add_argument("-n", dest="normchans", default="", const="RGBAZ",
                         nargs="?", help="Normalize output image's channels.")
-    # Argument: Z-channel for output file.
     class ZAction(Action):
+        """ Custom action for "-Z" argument. Adds Z as outchan and
+        normchan."""
         def __call__(self, parser, namespace, values, option_string=None):
             setattr(namespace, "outchans", "Z")
             normchans = getattr(namespace, "normchans")
             if "Z" not in normchans:
                 setattr(namespace, "normchans", normchans + "Z")
             delattr(namespace, "Z")
+    # Argument: Z-channel for output file.
     group.add_argument("-Z", nargs=0, action=ZAction,
                         help="Output normalized Z channel. Same as -c Z -n.")
     # Argument: value to fill nans with.
