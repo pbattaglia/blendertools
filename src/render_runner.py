@@ -24,10 +24,11 @@ def kill_blender():
 gpu_devices = ("CUDA", "OPENCL")
 
 
-def blender_run(f_anim, device_t=None, scenes=False, samples=None, frame=None):
+def blender_run(f_anim, device_t=None, scenes=False, samples=None,
+                frame=None, start=None, end=None, jump=None, output=None):
     """ Run rendering procedures."""
 
-    def render(f_anim, scene, device, samples, frame):
+    def render(f_anim, scene, device, samples, frame, output):
         """ Set the scene and do the render."""
         # Set the rendering device.
         scene.cycles.device = device
@@ -40,7 +41,11 @@ def blender_run(f_anim, device_t=None, scenes=False, samples=None, frame=None):
         if frame is not None:
             scene.frame_current = frame
         # Set output path.
-        scene.render.filepath = "//%s.png" % scene.name
+        if output is not None:
+            fn = output
+        else:
+            fn = scene.name
+        scene.render.filepath = "//{}".format(fn)
         # Render.
         bpy.ops.render.render(animation=f_anim, write_still=not f_anim,
                               scene=scene.name)
@@ -74,7 +79,11 @@ def blender_run(f_anim, device_t=None, scenes=False, samples=None, frame=None):
         scenes = [bpy.context.scene]
     # Loop over scenes.
     for scene in scenes:
-        render(f_anim, scene, device, samples, frame)
+        if start is not None:
+            scene.frame_start = start
+        if end is not None:
+            scene.frame_end = end
+        render(f_anim, scene, device, samples, frame, output)
 
 
 def run():
@@ -142,6 +151,22 @@ def run():
     parser.add_argument(
         "--render-frame", "-f", default=None, type=int,
         help="Sets frame to render.")
+    # Argument: frame start
+    parser.add_argument(
+        "--frame-start", "-s", default=None, type=int,
+        help="Sets start to frame.")
+    # Argument: frame end
+    parser.add_argument(
+        "--frame-end", "-e", default=None, type=int,
+        help="Sets end to frame.")
+    # Argument: frame jump
+    parser.add_argument(
+        "--frame-jump", "-j", default=None, type=int, help="Sets number of "
+        "frames to step forward after each rendered frame.")
+    # Argument: output
+    parser.add_argument(
+        "--render-output", "-o", default=None,
+        help="Set the render path and file name.")
     # Argument: f_no_kill.
     parser.add_argument(
         "--no-kill", action="store_true", default=False,
@@ -171,11 +196,16 @@ def run():
     scenes = [None if str(s).lower() in ("end", "none") else s
               for s in parsed.scenes]
     frame = parsed.render_frame
+    start = parsed.frame_start
+    end = parsed.frame_start
+    jump = parsed.frame_jump
+    output = parsed.render_output
     f_kill = not parsed.no_kill
     if bpy:
         # Render.
         blender_run(f_anim, device_t=device_t, samples=samples, scenes=scenes,
-                    frame=frame)
+                    frame=frame, start=start, end=end, jump=jump,
+                    output=output)
     else:
         print("** Called from outside Blender. Exiting. **")
     # Kill blender. This script is intended to be used as a final
