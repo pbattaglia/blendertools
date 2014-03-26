@@ -46,6 +46,7 @@ def blender_run(f_anim, device_t=None, scenes=False, samples=None,
         else:
             fn = scene.name
         scene.render.filepath = "//{}".format(fn)
+        scene.update()
         # Render.
         bpy.ops.render.render(animation=f_anim, write_still=not f_anim,
                               scene=scene.name)
@@ -79,6 +80,7 @@ def blender_run(f_anim, device_t=None, scenes=False, samples=None,
         scenes = [bpy.context.scene]
     # Loop over scenes.
     for scene in scenes:
+        bpy.context.screen.scene = scene
         if start is not None:
             scene.frame_start = start
         if end is not None:
