@@ -44,7 +44,9 @@ def blender_run(f_anim, device_t=None, scenes=False, samples=None,
         if output is not None:
             fn = output
         else:
-            fn = scene.name
+            fn = scene.name + "_"
+            if not f_anim:
+                fn += "{:04d}".format(scene.frame_current)
         scene.render.filepath = "//{}".format(fn)
         scene.update()
         # Render.
