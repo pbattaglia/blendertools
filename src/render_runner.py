@@ -201,7 +201,7 @@ def run():
               for s in parsed.scenes]
     frame = parsed.render_frame
     start = parsed.frame_start
-    end = parsed.frame_start
+    end = parsed.frame_end
     jump = parsed.frame_jump
     output = parsed.render_output
     f_kill = not parsed.no_kill
